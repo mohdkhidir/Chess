@@ -1,0 +1,41 @@
+{
+  "name": "biomed-ams",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Biomedical equipment asset management (CMMS) for Malaysian hospitals: asset tagging, PPM, corrective maintenance, helpdesk, KPI, approvals, predictive maintenance and lifecycle reports. Runs as a hospital server, a web app and an Android app.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "vite --config web/vite.config.js",
+    "build": "vite build --config web/vite.config.js",
+    "preview": "vite preview --config web/vite.config.js",
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "start:demo": "node --disable-warning=ExperimentalWarning server/index.js --demo",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/*.test.js\"",
+    "android:sync": "npm run build && cap sync android",
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.1",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/filesystem": "8.1.3",
+    "@capacitor/share": "8.0.2",
+    "jspdf": "4.2.1",
+    "jspdf-autotable": "5.0.8",
+    "jsqr": "1.4.0",
+    "qrcode": "1.5.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router-dom": "7.18.4",
+    "sql.js": "1.14.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.2",
+    "@vitejs/plugin-react": "6.1.1",
+    "vite": "8.3.1"
+  }
+}
