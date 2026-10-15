@@ -1,0 +1,105 @@
+name: BioMed AMS — test, Android APK, server package
+
+on:
+  push:
+    branches: [main]
+    paths: ['biomed-ams/**', '.github/workflows/biomed-ams.yml']
+  pull_request:
+    paths: ['biomed-ams/**', '.github/workflows/biomed-ams.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: biomed-ams-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    defaults:
+      run:
+        working-directory: biomed-ams
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: biomed-ams/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests (business rules, KPI, approvals, predictive)
+        run: npm test
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Copy web app into the Android project
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Build debug APK
+        working-directory: biomed-ams/android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Build signed release APK
+        if: env.HAS_SIGNING == 'true'
+        working-directory: biomed-ams/android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/release.jks" ./gradlew assembleRelease --no-daemon --stacktrace
+          rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Collect APK and server package
+        run: |
+          mkdir -p ../out
+          cp android/app/build/outputs/apk/debug/app-debug.apk "../out/BioMedAMS-1.0.${{ github.run_number }}-debug.apk"
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk "../out/BioMedAMS-1.0.${{ github.run_number }}.apk"
+          fi
+          zip -qr "../out/biomed-ams-server-1.0.${{ github.run_number }}.zip" core server web/dist package.json README.md -x '*.sqlite*'
+          ls -la ../out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BioMedAMS-android-apk
+          path: out/*.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: biomed-ams-server
+          path: out/*.zip
+
+      - name: Publish release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: biomed-ams-v1.0.${{ github.run_number }}
+          name: BioMed AMS 1.0.${{ github.run_number }}
+          body: |
+            **Android:** download the `.apk` on the phone and open it (allow "Install unknown apps" for your browser or file manager).
+            A `-debug` APK is re-signed on every build: uninstall the old one first, and back up standalone data before you do.
+            **Hospital server:** unzip `biomed-ams-server-*.zip` on a computer with Node.js 22.13+ and run `node server/index.js`.
+            See biomed-ams/README.md for setup.
+          files: |
+            out/*.apk
+            out/*.zip
