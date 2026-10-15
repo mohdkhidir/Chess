@@ -43,6 +43,9 @@ function toBase64(bytes) {
 // Saves a generated file. On Android it opens the share sheet (Drive, WhatsApp, e-mail, Files);
 // in a browser it downloads.
 export async function saveFile(filename, data, mime) {
+  if (!isNative() && window.claude) {
+    throw new Error('This web preview cannot save files. Use the Android app or the hospital server to export.');
+  }
   const bytes = typeof data === 'string'
     ? new TextEncoder().encode(data)
     : data instanceof ArrayBuffer ? new Uint8Array(data) : data;

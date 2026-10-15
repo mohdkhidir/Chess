@@ -8,10 +8,11 @@ export function getTheme() {
   }
 }
 
-export function applyTheme(theme = getTheme()) {
+// 'system' leaves the page alone at start-up, so a theme set by whatever hosts the page wins.
+export function applyTheme(theme = getTheme(), { initial = true } = {}) {
   const root = document.documentElement;
   if (theme === 'light' || theme === 'dark') root.setAttribute('data-theme', theme);
-  else root.removeAttribute('data-theme');
+  else if (!initial) root.removeAttribute('data-theme');
 }
 
 export function setTheme(theme) {
@@ -20,5 +21,5 @@ export function setTheme(theme) {
   } catch {
     /* ignore */
   }
-  applyTheme(theme);
+  applyTheme(theme, { initial: false });
 }

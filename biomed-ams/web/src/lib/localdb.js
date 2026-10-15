@@ -33,8 +33,21 @@ const idbGet = (key) => idb('readonly', (s) => s.get(key));
 const idbPut = (key, value) => idb('readwrite', (s) => s.put(value, key));
 const idbDel = (key) => idb('readwrite', (s) => s.delete(key));
 
+// WebAssembly first; if the WebView or page policy refuses it, fall back to the (slower, larger)
+// pure-JavaScript build so the app still works.
+async function loadSqlEngine() {
+  try {
+    return await initSqlJs({ locateFile: () => wasmUrl });
+  } catch (e) {
+    console.warn('WebAssembly SQLite unavailable, using the JavaScript build', e);
+    const mod = await import('sql.js/dist/sql-asm.js');
+    const init = mod.default || mod;
+    return init();
+  }
+}
+
 export async function openLocalDatabase() {
-  const SQL = await initSqlJs({ locateFile: () => wasmUrl });
+  const SQL = await loadSqlEngine();
   let bytes = null;
   try {
     bytes = await idbGet(KEY);
